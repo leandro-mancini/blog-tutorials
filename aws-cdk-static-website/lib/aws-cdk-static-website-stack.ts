@@ -28,14 +28,6 @@ export class AwsCdkStaticWebsiteStack extends cdk.Stack {
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
       },
       defaultRootObject: 'index.html',
-      errorResponses: [
-        {
-          httpStatus: 403,
-          responseHttpStatus: 403,
-          responsePagePath: 'error.html',
-          ttl: cdk.Duration.minutes(30)
-        }
-      ],
       minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_2_2019
     });
 
