@@ -4,12 +4,15 @@ import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as s3Deploy from 'aws-cdk-lib/aws-s3-deployment';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as cloudfrontOrigins from 'aws-cdk-lib/aws-cloudfront-origins';
+import * as certificatemanager from 'aws-cdk-lib/aws-certificatemanager';
+import * as route53 from 'aws-cdk-lib/aws-route53';
+import * as route53Targets from 'aws-cdk-lib/aws-route53-targets';
 import path = require('path');
 
 export class AwsCdkS3CloudfrontRoute53Stack extends cdk.Stack {
   private cfnOutCloudFrontUrl: cdk.CfnOutput;
   private cfnOutDistributionId: cdk.CfnOutput;
-  
+
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
@@ -20,6 +23,16 @@ export class AwsCdkS3CloudfrontRoute53Stack extends cdk.Stack {
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       publicReadAccess: false
+    });
+
+    const hostedZone = route53.HostedZone.fromLookup(this, `${idName}HostedZone`, {
+      domainName: 'mancinidev.me'
+    });
+
+    const certificate = new certificatemanager.Certificate(this, `${idName}Certificate`, {
+      domainName: 'aws-cdk-s3-cloudfront-route53.mancinidev.me',
+      subjectAlternativeNames: ['*.mancinidev.me'],
+      validation: certificatemanager.CertificateValidation.fromDns(hostedZone),
     });
 
     const distribution = new cloudfront.Distribution(this, `${idName}Distribution`, {
@@ -37,8 +50,16 @@ export class AwsCdkS3CloudfrontRoute53Stack extends cdk.Stack {
           responseHttpStatus: 200,
         }
       ],
-      minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021
+      minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
+      domainNames: ['aws-cdk-s3-cloudfront-route53.mancinidev.me'],
+      certificate: certificate,
     });
+
+    new route53.ARecord(this, `${idName}AliasRecord`, {
+      zone: hostedZone,
+      target: route53.RecordTarget.fromAlias(new route53Targets.CloudFrontTarget(distribution)),
+      recordName: 'aws-cdk-s3-cloudfront-route53'
+    })
 
     new s3Deploy.BucketDeployment(this, `${idName}BucketDeployment`, {
       sources: [s3Deploy.Source.asset(path.join(__dirname, '../website/dist'))],
